@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Животный Акинатор</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        #game-area { border: 1px solid #ccc; padding: 15px; max-width: 600px; margin: auto; }
+    </style>
+</head>
+<body>
+    <div id="game-area">
+        <h2>Угадай животное!</h2>
+        <div id="question"></div>
+        <button onclick="answer('yes')">Да</button>
+        <button onclick="answer('no')">Нет</button>
+
+        <div id="result" style="display: none; margin-top: 20px;">
+            <h3>Поздравляем! Это:</h3>
+            <p id="animal-name"></p>
+            <button onclick="startOver()">Играть снова</button>
+        </div>
+    </div>
+
+    <script>
+        let currentNodeId = null;
+
+        async function startGame() {
+            const response = await fetch('/start');
+            const data = await response.json();
+            currentNodeId = data.root_id;
+            showQuestion(currentNodeId);
+        }
+
+        async function answer(answer) {
+            const response = await fetch(`/question/${currentNodeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer })
+            });
+
+            const result = await response.json();
+            currentNodeId = result.node_id;
+            showQuestion(currentNodeId);
+        }
+
+        async function showQuestion(nodeId) {
+            if (nodeId === null) {
+                document.getElementById('result').style.display = 'none';
+                return;
+            }
+
+            const response = await fetch(`/question/${nodeId}`);
+            const data = await response.json();
+            document.getElementById('question').textContent = data.question;
+        }
+
+        async function getAnimal() {
+            if (currentNodeId === null) return;
+
+            const response = await fetch(`/result/${currentNodeId}`);
+            const data = await response.json();
+
+            if (data.error) {
+                alert("Животное не найдено! Пожалуйста, добавьте его в дерево.");
+                startOver();
+            } else {
+                document.getElementById('animal-name').textContent = data.animal;
+                document.getElementById('result').style.display = 'block';
+            }
+        }
+
+        function startOver() {
+            currentNodeId = null;
+            showQuestion(currentNodeId);
+        }
+
+        // Запуск игры при загрузке
+        window.onload = startGame;
+    </script>
+</body>
+</html>
