@@ -24,9 +24,9 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS animals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                species TEXT NOT NULL,
-                age INTEGER NOT NULL
+                question TEXT NOT NULL,
+                yes INTEGER,
+                no INTEGER
             )
         ''')
         conn.commit()
@@ -84,16 +84,35 @@ def get_animal(animal_id: int):
 
 # Добавить животное
 @router.post("/", response_model=Animal)
-def create_animal(animal: Animal):
+def add_question(animal: Animal, answer: str = "yes", parent_id: int = -1) -> Animal:
+
+    if answer not in ("yes", "no"):
+        raise ValueError("answer must be 'yes' or 'no'")
+    
     try:
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO animals (name, species, age) VALUES (?, ?, ?)",
-                (animal.name, animal.species, animal.age)
+                "INSERT INTO animals (question, yes, no) VALUES (?, ?, ?)",
+                (animal.question, None, None)
             )
+            
+            new_id = cursor.lastrowid
+
+            if parent_id != -1:
+                conn.execute(
+                    f"UPDATE animals SET {answer} = ? WHERE id = ?",
+                    (new_id, parent_id)
+                )
+                
             conn.commit()
-            return {"status": "success", "message": "Animal added"}
+
+            row = conn.execute(
+                "SELECT * FROM animals WHERE id = ?",
+                (new_id,)
+            ).fetchone()
+
+            return Animal(**dict(row))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -105,8 +124,8 @@ def update_animal(animal_id: int, updated_animal: Animal):
     if not result:
         raise HTTPException(status_code=404, detail="Животное не найдено")
 
-    query_db("UPDATE animals SET name=?, species=?, age=? WHERE id=?",
-             (updated_animal.name, updated_animal.species, updated_animal.age, animal_id))
+    query_db("UPDATE animals SET question=?, yes=?, no=? WHERE id=?",
+             (updated_animal.question, updated_animal.yes, updated_animal.no, animal_id))
     return get_animal(animal_id)
 
 
